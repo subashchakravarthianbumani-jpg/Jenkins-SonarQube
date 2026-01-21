@@ -1,11 +1,17 @@
 pipeline {
     agent any
 
+    tools {
+        jdk 'jdk17'
+    }
+
     environment {
-        SONARQUBE_ENV = 'sonarqube'
+        SONAR_PROJECT_KEY = "jenkins-sonarqube-demo"
+        SONAR_PROJECT_NAME = "Jenkins SonarQube Demo"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -14,10 +20,23 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv("${SONARQUBE_ENV}") {
-                    sh '''
-                    echo "Running SonarQube Scan"
-                    '''
+                withSonarQubeEnv('sonarqube') {
+                    sh """
+                      sonar-scanner \
+                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                      -Dsonar.projectName='${SONAR_PROJECT_NAME}' \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=$SONAR_HOST_URL \
+                      -Dsonar.login=$SONAR_AUTH_TOKEN
+                    """
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -25,10 +44,10 @@ pipeline {
 
     post {
         success {
-            echo 'Build & Sonar Scan Success'
+            echo '✅ SonarQube Analysis PASSED'
         }
         failure {
-            echo 'Build Failed'
+            echo '❌ SonarQube Analysis FAILED'
         }
     }
 }
